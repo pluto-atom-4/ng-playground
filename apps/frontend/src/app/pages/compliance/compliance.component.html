@@ -1,0 +1,46 @@
+<div class="compliance-container">
+  <h1>Aircraft Compliance Dashboard</h1>
+  
+  <div class="filters">
+    <label for="modelFilter">Filter by Model:</label>
+    <input 
+      id="modelFilter"
+      type="text" 
+      [(ngModel)]="modelFilter" 
+      (input)="loadData()"
+      placeholder="e.g., 737"
+      class="filter-input"
+    />
+  </div>
+
+  <div *ngIf="loading" class="loading">Loading...</div>
+  
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <div *ngIf="!loading && !error && aircraft.length === 0" class="no-data">
+    No overdue or upcoming compliance checks found.
+  </div>
+
+  <table *ngIf="!loading && aircraft.length > 0" class="compliance-table">
+    <thead>
+      <tr>
+        <th>Tail Number</th>
+        <th>Model</th>
+        <th>Manufacturer</th>
+        <th>Due In (Days)</th>
+        <th>Recent Checks</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of aircraft" [ngClass]="getRowClass(item.daysUntilDue)">
+        <td>{{ item.tailNumber }}</td>
+        <td>{{ item.model }}</td>
+        <td>{{ item.manufacturer }}</td>
+        <td [class.overdue-text]="item.daysUntilDue < 0">
+          {{ item.daysUntilDue }}
+        </td>
+        <td>{{ item.recentChecks }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

@@ -39,3 +39,6 @@ bld/
 
 # MSBuild
 *.sln.proj
+
+# Development settings with credentials
+appsettings.Development.json
