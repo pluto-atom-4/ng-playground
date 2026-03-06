@@ -40,5 +40,13 @@ bld/
 # MSBuild
 *.sln.proj
 
-# Development settings with credentials
+# Configuration files with credentials
+# Never commit environment-specific settings or secrets
 appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Production.json
+secrets.json
+.env
+.env.local
+.env.*.local
