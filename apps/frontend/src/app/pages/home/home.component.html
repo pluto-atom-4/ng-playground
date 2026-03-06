@@ -1,0 +1,21 @@
+<div class="container">
+  <h1>Full-Stack Playground</h1>
+  <p>Angular Frontend + .NET 9 Backend</p>
+
+  <div class="api-section">
+    <h2>Backend Health Check</h2>
+    <button (click)="fetchMessage()">Fetch Message</button>
+
+    <div *ngIf="loading" class="loading">
+      Loading...
+    </div>
+
+    <div *ngIf="error" class="error">
+      {{ error }}
+    </div>
+
+    <div *ngIf="apiMessage && !loading" class="success">
+      <strong>Backend Response:</strong> {{ apiMessage }}
+    </div>
+  </div>
+</div>
