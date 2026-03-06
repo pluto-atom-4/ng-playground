@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace backend.Models;
 
 public class ComplianceLog
 {
+    [Key]
     public int LogId { get; set; }
     public int AircraftId { get; set; }
     public DateTime PerformedDate { get; set; }
