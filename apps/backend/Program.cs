@@ -1,4 +1,15 @@
+using backend.Data;
+using backend.Services;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Add DbContext
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Add Services
+builder.Services.AddScoped<AircraftComplianceService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -25,6 +36,12 @@ app.MapGet("/api/health", () =>
 app.MapGet("/api/hello", () =>
     new { message = "Hello from C# .NET 9 backend!" })
 .WithName("Hello")
+.WithOpenApi();
+
+// Compliance endpoint
+app.MapGet("/api/compliance/overdue", async (AircraftComplianceService svc, string? modelFilter) =>
+    await svc.GetOverdueAircraftAsync(modelFilter))
+.WithName("GetOverdueAircraft")
 .WithOpenApi();
 
 app.Run("http://localhost:5000");
