@@ -11,7 +11,7 @@
     "frontend:test": "pnpm -F frontend test",
     "backend:restore": "cd apps/backend && dotnet restore",
     "backend:build": "cd apps/backend && dotnet build",
-    "backend:dev": "cd apps/backend && dotnet run",
+    "backend:dev": "cd apps/backend && ASPNETCORE_ENVIRONMENT=Development dotnet run",
     "backend:test": "cd apps/backend && dotnet test",
     "install": "pnpm install && pnpm backend:restore"
   }
