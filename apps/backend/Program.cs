@@ -10,6 +10,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Add Services
 builder.Services.AddScoped<AircraftComplianceService>();
+builder.Services.AddHostedService<DatabaseStartupService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
