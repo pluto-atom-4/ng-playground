@@ -15,8 +15,9 @@ public class AircraftComplianceService
 
     public async Task<IEnumerable<ComplianceDto>> GetOverdueAircraftAsync(string? modelFilter = null)
     {
-        var oneYearAgo = DateTime.Now.AddYears(-1);
-        var oneMonthFromNow = DateTime.Now.AddMonths(1);
+        var now = DateTime.UtcNow;
+        var oneYearAgo = now.AddYears(-1);
+        var oneMonthFromNow = now.AddMonths(1);
 
         var query = _context.Aircraft
             .AsNoTracking()
@@ -24,7 +25,7 @@ public class AircraftComplianceService
 
         if (!string.IsNullOrEmpty(modelFilter))
         {
-            query = query.Where(a => a.Model.Contains(modelFilter));
+            query = query.Where(a => EF.Functions.Like(a.Model, $"%{modelFilter}%"));
         }
 
         var results = await query
@@ -34,13 +35,13 @@ public class AircraftComplianceService
                 a.Model,
                 a.Manufacturer,
                 a.NextDueDate,
-                (int)EF.Functions.DateDiffDay(DateTime.Now, a.NextDueDate),
-                a.ComplianceLogs
+                (int)EF.Functions.DateDiffDay(now, a.NextDueDate),
+                (a.ComplianceLogs ?? new List<ComplianceLog>())
                     .Where(cl => cl.PerformedDate >= oneYearAgo)
                     .Count()
             ))
             .ToListAsync();
 
-        return results;
+        return results ?? new List<ComplianceDto>();
     }
 }
