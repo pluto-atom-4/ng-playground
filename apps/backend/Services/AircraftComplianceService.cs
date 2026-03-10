@@ -1,16 +1,18 @@
-using backend.Data;
 using backend.DTOs;
-using Microsoft.EntityFrameworkCore;
+using backend.Models;
+using Dapper;
+using System.Data;
+using System.Data.SqlClient;
 
 namespace backend.Services;
 
 public class AircraftComplianceService
 {
-    private readonly AppDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public AircraftComplianceService(AppDbContext context)
+    public AircraftComplianceService(IConfiguration configuration)
     {
-        _context = context;
+        _configuration = configuration;
     }
 
     public async Task<IEnumerable<ComplianceDto>> GetOverdueAircraftAsync(string? modelFilter = null)
@@ -19,29 +21,64 @@ public class AircraftComplianceService
         var oneYearAgo = now.AddYears(-1);
         var oneMonthFromNow = now.AddMonths(1);
 
-        var query = _context.Aircraft
-            .AsNoTracking()
-            .Where(a => a.NextDueDate < oneMonthFromNow);
+        var connectionString = _configuration.GetConnectionString("DefaultConnection");
+        
+        using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync();
 
-        if (!string.IsNullOrEmpty(modelFilter))
-        {
-            query = query.Where(a => EF.Functions.Like(a.Model, $"%{modelFilter}%"));
-        }
-
-        var results = await query
-            .Select(a => new ComplianceDto(
+        // Get aircraft with upcoming/overdue compliance dates
+        var aircraftQuery = @"
+            SELECT 
                 a.AircraftId,
                 a.TailNumber,
                 a.Model,
                 a.Manufacturer,
                 a.NextDueDate,
-                (int)EF.Functions.DateDiffDay(now, a.NextDueDate),
-                (a.ComplianceLogs ?? new List<ComplianceLog>())
-                    .Where(cl => cl.PerformedDate >= oneYearAgo)
-                    .Count()
-            ))
-            .ToListAsync();
+                DATEDIFF(DAY, @Now, a.NextDueDate) AS DaysUntilDue
+            FROM Aircraft a
+            WHERE a.NextDueDate < @OneMonthFromNow
+        ";
 
-        return results ?? new List<ComplianceDto>();
+        if (!string.IsNullOrEmpty(modelFilter))
+        {
+            aircraftQuery += " AND a.Model LIKE @ModelFilter";
+        }
+
+        aircraftQuery += " ORDER BY a.NextDueDate ASC";
+
+        var aircraftData = await connection.QueryAsync<dynamic>(
+            aircraftQuery,
+            new { Now = now, OneMonthFromNow = oneMonthFromNow, ModelFilter = $"%{modelFilter}%" }
+        );
+
+        var results = new List<ComplianceDto>();
+
+        foreach (var aircraft in aircraftData)
+        {
+            // Get recent compliance checks for this aircraft
+            var checksQuery = @"
+                SELECT COUNT(*) 
+                FROM ComplianceLogs 
+                WHERE AircraftId = @AircraftId 
+                AND PerformedDate >= @OneYearAgo
+            ";
+
+            var recentChecks = await connection.QuerySingleAsync<int>(
+                checksQuery,
+                new { AircraftId = (int)aircraft.AircraftId, OneYearAgo = oneYearAgo }
+            );
+
+            results.Add(new ComplianceDto(
+                aircraft.AircraftId,
+                aircraft.TailNumber,
+                aircraft.Model,
+                aircraft.Manufacturer,
+                aircraft.NextDueDate,
+                aircraft.DaysUntilDue,
+                recentChecks
+            ));
+        }
+
+        return results;
     }
 }

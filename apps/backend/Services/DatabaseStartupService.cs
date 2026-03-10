@@ -1,16 +1,17 @@
-using backend.Data;
-using Microsoft.EntityFrameworkCore;
+using Dapper;
+using System.Data;
+using System.Data.SqlClient;
 
 namespace backend.Services;
 
 public class DatabaseStartupService : IHostedService
 {
-    private readonly IServiceProvider _services;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<DatabaseStartupService> _logger;
 
-    public DatabaseStartupService(IServiceProvider services, ILogger<DatabaseStartupService> logger)
+    public DatabaseStartupService(IConfiguration configuration, ILogger<DatabaseStartupService> logger)
     {
-        _services = services;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -18,32 +19,30 @@ public class DatabaseStartupService : IHostedService
     {
         _logger.LogInformation("--- Azure SQL Database Startup Check ---");
 
-        using var scope = _services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        // Extract server/db from the connection string for informational logging (no credentials)
-        var connStr = db.Database.GetConnectionString() ?? string.Empty;
-        LogConnectionTarget(connStr);
+        var connectionString = _configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+        LogConnectionTarget(connectionString);
 
         try
         {
-            var canConnect = await db.Database.CanConnectAsync(cancellationToken);
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
 
-            if (canConnect)
-            {
-                _logger.LogInformation("✓ Connection successful.");
+            _logger.LogInformation("✓ Connection successful.");
 
-                var aircraftCount  = await db.Aircraft.CountAsync(cancellationToken);
-                var logCount       = await db.ComplianceLogs.CountAsync(cancellationToken);
+            // Query Aircraft table record count
+            var aircraftCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM Aircraft",
+                commandTimeout: 10
+            );
 
-                _logger.LogInformation("✓ Aircraft table       : {Count} record(s)", aircraftCount);
-                _logger.LogInformation("✓ ComplianceLogs table : {Count} record(s)", logCount);
-            }
-            else
-            {
-                _logger.LogWarning("✗ CanConnectAsync returned false — database unreachable.");
-                _logger.LogWarning("  API endpoints that query the database will return HTTP 500.");
-            }
+            // Query ComplianceLogs table record count
+            var logCount = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM ComplianceLogs",
+                commandTimeout: 10
+            );
+
+            _logger.LogInformation("✓ Aircraft table       : {Count} record(s)", aircraftCount);
+            _logger.LogInformation("✓ ComplianceLogs table : {Count} record(s)", logCount);
         }
         catch (Exception ex)
         {
@@ -59,7 +58,7 @@ public class DatabaseStartupService : IHostedService
     // Parses "Server=tcp:..." and "Initial Catalog=..." without exposing credentials
     private void LogConnectionTarget(string connStr)
     {
-        var server   = ExtractSegment(connStr, "Server=tcp:", ",");
+        var server = ExtractSegment(connStr, "Server=tcp:", ",");
         var database = ExtractSegment(connStr, "Initial Catalog=", ";");
 
         if (!string.IsNullOrEmpty(server) || !string.IsNullOrEmpty(database))
